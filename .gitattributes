@@ -1,0 +1,15 @@
+# normalise line endings in the repository
+* text=auto
+
+# shell scripts must keep Unix line endings or Linux/macOS builders cannot run them
+gradlew text eol=lf
+*.sh text eol=lf
+deploy/Caddyfile text eol=lf
+deploy/*.service text eol=lf
+Dockerfile text eol=lf
+*.bat text eol=crlf
+
+# binary
+*.png binary
+*.jar binary
+*.db binary

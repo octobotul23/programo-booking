@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The only folders other apps can be handed a file from: exports made by ProgramoPlugin, and the photo
+     folder Capacitor uses if a page ever asks for a camera picture. Nothing else on the phone. -->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <cache-path name="shared" path="shared/" />
+    <external-files-path name="my_images" path="Pictures/" />
+</paths>

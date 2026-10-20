@@ -1,0 +1,47 @@
+# Programo as a locked-down Linux service (for a server without Docker). Install: see DEPLOY.md → "Without Docker".
+#   sudo cp deploy/programo.service /etc/systemd/system/ && sudo systemctl enable --now programo
+[Unit]
+Description=Programo appointments
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=programo
+Group=programo
+WorkingDirectory=/opt/programo
+Environment=NODE_ENV=production PORT=3000 HOST=127.0.0.1 DATA_DIR=/var/lib/programo
+EnvironmentFile=-/opt/programo/.env
+ExecStart=/usr/bin/node server/index.js
+Restart=on-failure
+RestartSec=3
+
+# the database lives here (created by systemd, only this service can write it)
+StateDirectory=programo
+StateDirectoryMode=0700
+UMask=0077
+
+# everything else read-only and out of reach
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target

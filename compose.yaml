@@ -1,0 +1,51 @@
+# Live server with HTTPS: the app + Caddy (gets and renews the certificate by itself).
+# On a VPS with a domain pointed at it:  cp .env.example .env  →  edit .env  →  docker compose up -d --build
+# Full guide: DEPLOY.md
+services:
+  app:
+    build: .
+    image: programo:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATA_DIR: /data
+      # exactly one proxy (Caddy) stands in front, so its X-Forwarded-For is believed and nobody else's
+      TRUST_PROXY: "1"
+    volumes:
+      - programo-data:/data
+    # not reachable from outside: only Caddy talks to it
+    expose:
+      - "3000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    pids_limit: 200
+
+  caddy:
+    image: caddy:2.10
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  programo-data:
+  caddy-data:
+  caddy-config:

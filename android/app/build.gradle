@@ -1,0 +1,90 @@
+apply plugin: 'com.android.application'
+
+// the app's version follows package.json: 1.2.3 → versionName "1.2.3", versionCode 10203 (must grow for updates to install)
+def appVersion = new groovy.json.JsonSlurper().parse(rootProject.file('../package.json')).version
+// no -beta / +build suffix: 1.1.0-beta and 1.1.0 would get the same code, and phones would refuse the second
+if (!(appVersion ==~ /\d{1,2}(\.\d{1,2}){0,2}/)) {
+    throw new GradleException("package.json version \"${appVersion}\" must look like 1.2.3, each part 0-99 (no -beta/+build suffix)")
+}
+def appVersionCode = (appVersion.tokenize('.') + ['0', '0', '0']).take(3).inject(0) { n, part -> n * 100 + (part as int) }
+
+android {
+    namespace = "ro.programo.app"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "ro.programo.app"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode Math.max(appVersionCode, 1)
+        versionName appVersion
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    // Release signing comes from the environment, never from this folder (npm run android:apk sets it from
+    // mobile/local-tools.json):
+    //   PROGRAMO_KEYSTORE=path/to/programo.jks  PROGRAMO_KEYSTORE_PASSWORD=...  PROGRAMO_KEY_ALIAS=programo
+    //   PROGRAMO_KEY_PASSWORD=... (only if the key's password differs from the keystore's)
+    signingConfigs {
+        release {
+            def keystore = System.getenv('PROGRAMO_KEYSTORE')
+            if (keystore) {
+                storeFile file(keystore)
+                storePassword System.getenv('PROGRAMO_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('PROGRAMO_KEY_ALIAS') ?: 'programo'
+                keyPassword System.getenv('PROGRAMO_KEY_PASSWORD') ?: System.getenv('PROGRAMO_KEYSTORE_PASSWORD')
+            }
+        }
+    }
+    // test-only files from the libraries that the app never uses
+    packaging {
+        resources {
+            excludes += ['DebugProbesKt.bin', 'org/apache/cordova/allowlist/**']
+        }
+    }
+    buildTypes {
+        // a debug build installs as a separate app (ro.programo.app.debug), so it can never replace or
+        // update the signed release
+        debug {
+            applicationIdSuffix '.debug'
+            versionNameSuffix '-debug'
+        }
+        release {
+            if (signingConfigs.release.storeFile) signingConfig signingConfigs.release
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}

@@ -1,0 +1,23 @@
+# HTTPS in front of Programo. Caddy fetches and renews the certificate on its own.
+# Docker (compose.yaml): DOMAIN comes from .env and the app is at app:3000.
+# Plain server without Docker: set DOMAIN and UPSTREAM=127.0.0.1:3000 for the caddy service.
+{$DOMAIN} {
+	encode zstd gzip
+
+	# the app sends its own security headers; drop the one that names the server software
+	header -Server
+
+	# nothing the app accepts is bigger than this
+	request_body {
+		max_size 1MB
+	}
+
+	reverse_proxy {$UPSTREAM:app:3000}
+
+	log {
+		output stdout
+		format console
+	}
+}
+
+# plain-HTTP visits are sent to HTTPS automatically

@@ -1,0 +1,25 @@
+# only package files, client/, server/ and vite.config.js are needed to build the image
+node_modules
+dist
+data
+backups
+android
+ios
+mobile
+deploy
+.github
+.claude
+.playwright-mcp
+.git
+.env
+.env.*
+*.apk
+*.aab
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.p8
+*.pem
+*.key
+*.md

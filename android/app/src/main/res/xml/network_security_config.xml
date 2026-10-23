@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written by mobile/configure.mjs from the server address (not repeated here: an XML comment may not hold
+     two hyphens in a row, and every international domain name has them). https only, with the phone's own
+     trusted certificates (no user-installed ones, so a "monitoring" profile cannot read the traffic). -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="ro">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!-- Written by mobile/configure.mjs: where Retry goes, the oldest WebView the app works on (from
+         capacitor.config.json), and the hash that allows the one script below.
+         This page has to be self-contained: while the app points at a server, Capacitor serves only this one
+         file from the phone, so any script or style file next to it would never load. -->
+    <meta name="programo-url" content="https://x237.tail36214d.ts.net:8443" />
+    <meta name="programo-min-webview" content="111" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'sha256-a7sePX8lPR9pvrF74DDYEr2eG3dYOS1kMpDZ19nbXho='; base-uri 'none'; form-action 'none'" />
+    <title>Programo</title>
+    <style>
+      :root {
+        --ink: #0d0d0f;
+        --paper: #f1efe9;
+        --mute: rgba(241, 239, 233, 0.6);
+        --gold: #c9a96e;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: var(--ink);
+        color: var(--paper);
+        font: 15px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+      main {
+        min-height: 100%;
+        display: grid;
+        place-items: center;
+        padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
+        background: radial-gradient(ellipse at 50% 0%, rgba(201, 169, 110, 0.14), transparent 60%);
+      }
+      .card {
+        width: 100%;
+        max-width: 380px;
+        text-align: center;
+      }
+      svg {
+        width: 72px;
+        height: 72px;
+      }
+      h1 {
+        margin: 20px 0 8px;
+        font-size: 22px;
+        line-height: 1.25;
+        letter-spacing: -0.01em;
+      }
+      p {
+        margin: 0;
+        color: var(--mute);
+      }
+      .en {
+        margin-top: 22px;
+        padding-top: 18px;
+        border-top: 1px solid rgba(241, 239, 233, 0.1);
+        font-size: 13px;
+      }
+      button {
+        margin-top: 26px;
+        width: 100%;
+        height: 48px;
+        border: 0;
+        border-radius: 999px;
+        background: var(--gold);
+        color: #17130b;
+        font: inherit;
+        font-weight: 600;
+      }
+      button:active {
+        opacity: 0.85;
+      }
+      .wait {
+        margin-top: 12px;
+        font-size: 12px;
+        min-height: 18px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="card">
+        <svg viewBox="0 0 32 32" aria-hidden="true">
+          <rect width="32" height="32" rx="9" fill="#1a1a1d" />
+          <rect x="7" y="8.5" width="18" height="16" rx="3.5" fill="none" stroke="#c9a96e" stroke-width="2" />
+          <path d="M7 13.5h18M12 6v4.5M20 6v4.5" stroke="#c9a96e" stroke-width="2" stroke-linecap="round" />
+          <circle cx="16" cy="19" r="2.2" fill="#f1efe9" />
+        </svg>
+        <h1 id="title">Nu putem ajunge la server</h1>
+        <p id="ro">Verifică internetul (sau Tailscale, dacă îl folosești) și încearcă din nou.</p>
+        <p class="en" id="en">Can't reach the server. Check your internet connection (or Tailscale) and try again.</p>
+        <button id="retry" type="button">Încearcă din nou · Try again</button>
+        <p class="wait" id="wait"></p>
+      </div>
+    </main>
+    <script>
+      // Back to the server on a tap, when the phone comes back online, and every 30 seconds while the screen
+      // is on. It simply opens the server; if that fails, the app shows a fresh copy of this page.
+      (function () {
+        function meta(name) {
+          var m = document.querySelector('meta[name="' + name + '"]');
+          return m ? m.content : '';
+        }
+        var url = meta('programo-url');
+        var wait = document.getElementById('wait');
+        var button = document.getElementById('retry');
+
+        // A WebView too old for the app: retrying would only open a broken page, so say what to update instead.
+        // (Capacitor sends such phones here before trying the server: android.minWebViewVersion.)
+        var chrome = /Chrome\/(\d+)/.exec(navigator.userAgent);
+        if (chrome && Number(chrome[1]) < Number(meta('programo-min-webview'))) {
+          document.getElementById('title').textContent = 'Actualizează Android System WebView';
+          document.getElementById('ro').textContent =
+            'Aplicația are nevoie de o versiune mai nouă a Android System WebView (pe Android 8 și 9: Google Chrome). Actualizeaz-o din Google Play sau din magazinul de aplicații al telefonului, apoi deschide din nou aplicația.';
+          document.getElementById('en').textContent =
+            "The app needs a newer Android System WebView (on Android 8 and 9: Google Chrome). Update it from Google Play or your phone's app store, then open the app again.";
+          button.hidden = true;
+          return;
+        }
+
+        // An attempt can be handed to another app instead of loading (a Wi-Fi sign-in page opens in the browser).
+        // Then automatic retries stop for 10 minutes, so they don't keep sending the user away; a tap still tries.
+        // This is kept in sessionStorage because a failed attempt replaces this page with a fresh copy of it (on
+        // iOS even when the attempt went to another app), and the copy must still know.
+        var KEY = 'programo-offline';
+        var state = {};
+        try {
+          state = JSON.parse(sessionStorage.getItem(KEY)) || {};
+        } catch (e) {}
+        function save() {
+          try {
+            sessionStorage.setItem(KEY, JSON.stringify(state));
+          } catch (e) {}
+        }
+        // How long ago a time stored by an earlier copy was. Those are wall-clock times: one that the phone's clock
+        // has since been set back past counts as long ago, not as "just now" for the next hour.
+        function age(t) {
+          var d = Date.now() - t;
+          return t && d >= 0 ? d : Infinity;
+        }
+        function auto() {
+          return age(state.away) >= 600000;
+        }
+        var TAP = 'Atinge butonul ca să încerci din nou · Tap the button to try again';
+
+        // this copy's own times, on a clock that never goes back
+        function clock() {
+          return performance.now();
+        }
+        var last = null; // when this page's last attempt started: one at a time
+        var born = clock();
+        // this copy is going away: replaced by the server's page, or by a fresh copy of itself after a failed
+        // attempt. The screen it gives up then is not the app losing the screen.
+        var leaving = false;
+        window.addEventListener('pagehide', function () {
+          leaving = true;
+        });
+        window.addEventListener('pageshow', function () {
+          leaving = false;
+        });
+        function retry(byUser) {
+          if (!url || (last !== null && clock() - last < 15000)) return;
+          if (byUser === true) state.away = 0;
+          else if (!auto()) return;
+          last = clock();
+          state.tried = Date.now();
+          save();
+          wait.textContent = 'Se conectează… · Connecting…';
+          window.location.replace(url);
+        }
+        // The app lost the screen (or the focus, to an app chooser) because an attempt went to another app. Either
+        // this copy's own attempt started under 3 s ago (Android keeps the page that tried, and a hand-over comes
+        // with the first answer; leaving while an attempt just hangs, as when the server PC sleeps, is the screen
+        // timing out or a trip to Settings), or this copy replaced that page a moment ago (iOS reloads it when it
+        // hands the address over). Leaving to turn Tailscale or Wi-Fi on is not counted: back in the app, retries go
+        // on by themselves.
+        function left() {
+          if (leaving) return;
+          if ((last !== null && clock() - last < 3000) || (clock() - born < 2000 && age(state.tried) < 10000)) {
+            state.away = Date.now();
+            save();
+          }
+        }
+        button.addEventListener('click', function () {
+          retry(true);
+        });
+        window.addEventListener('online', function () {
+          if (document.visibilityState === 'visible') retry();
+        });
+        window.addEventListener('blur', left);
+        document.addEventListener('visibilitychange', function () {
+          if (document.visibilityState === 'hidden') left();
+          else {
+            // back in the app: an attempt that went nowhere must not block the next one
+            last = null;
+            wait.textContent = auto() ? '' : TAP;
+          }
+        });
+        // a copy that loads with the app already in the background (iOS, while the other app opens)
+        if (document.visibilityState === 'hidden') left();
+        if (!auto()) wait.textContent = TAP;
+        setInterval(function () {
+          if (document.visibilityState === 'visible') retry();
+        }, 30000);
+      })();
+    </script>
+  </body>
+</html>
